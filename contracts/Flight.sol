@@ -12,15 +12,16 @@ contract Flight {
     uint256 public timestamp;
     uint256 public baseFare;
     uint256 public passengerLimit;
-    uint256 public passengerCount;
     uint256 public delayLimit = 10800;
     uint256 public withdrawWait = 172800;
     uint256 public disputeFee;
     address payable public flightOwner;
     address payable public escrow;
-    address payable public delayDisputeRaiser;
     bytes32 public departure;
     bytes32 public arrival;
+    
+    uint256 public passengerCount;
+    address payable public delayDisputeRaiser;
     string public escrowDecisionReason;
     bool public shouldRefund = false;
 
