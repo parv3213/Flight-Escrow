@@ -19,7 +19,7 @@ contract Flight {
     address payable public escrow;
     bytes32 public departure;
     bytes32 public arrival;
-    
+
     uint256 public passengerCount;
     address payable public delayDisputeRaiser;
     string public escrowDecisionReason;
@@ -28,10 +28,11 @@ contract Flight {
     mapping(uint256 => Passenger) public passengers;
 
     struct Passenger {
-        address passenger;
+        address payable buyer;
+        string passengerName;
     }
 
-    event PassengerAdded(address indexed passenger);
+    event PassengerAdded(address indexed buyer, string passengerName);
     event DelayDisputeRaised(address sender);
     event Withdrawal(address withdrawer, uint256 amount);
 
@@ -52,9 +53,10 @@ contract Flight {
         uint256 _baseFare,
         uint256 _passengerLimit,
         address payable _escrow,
-        uint256 _disputeFee
+        uint256 _disputeFee,
+        address payable _flightOwner
     ) public {
-        flightOwner = msg.sender;
+        flightOwner = _flightOwner;
         timestamp = _timestamp;
         departure = _departure;
         arrival = _arrival;
@@ -64,26 +66,17 @@ contract Flight {
         disputeFee = _disputeFee;
     }
 
-    function buyTicket(address[] calldata _passengers) external payable {
-        require(
-            passengerCount.add(_passengers.length) <= passengerLimit,
-            "Passenger limit reached"
-        );
-        require(
-            msg.value == baseFare.mul(_passengers.length),
-            "Provide correct amount"
-        );
-        for (uint256 i = 0; i < _passengers.length; i++) {
-            passengers[passengerCount] = Passenger({passenger: _passengers[i]});
-            passengerCount = passengerCount.add(1);
-            emit PassengerAdded(_passengers[i]);
-        }
+    function buyTicket(address payable _buyer, string memory _passengerName) external payable {
+        require(msg.value == baseFare, "Provide correct amount");
+        passengers[passengerCount] = Passenger({buyer: _buyer, passengerName: _passengerName});
+        passengerCount = passengerCount.add(1);
+        emit PassengerAdded(_buyer, _passengerName);
     }
 
     function flightDelayRaise() external payable {
         require(status == Status.noDispute, "Not allowed");
-        require(now >= (timestamp + delayLimit), "Delay limit not reached");
-        require(now <= timestamp + withdrawWait, "Dispute time up");
+        require(now >= (timestamp.add(delayLimit)), "Delay limit not reached");
+        require(now <= timestamp.add(withdrawWait), "Dispute time up");
         require(msg.value == disputeFee, "Provide correct dispute fee");
         status = Status.inDispute;
         delayDisputeRaiser = msg.sender;
