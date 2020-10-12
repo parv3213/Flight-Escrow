@@ -30,6 +30,7 @@ contract Flight {
     struct Passenger {
         address payable buyer;
         string passengerName;
+        bool refunded;
     }
 
     event PassengerAdded(address indexed buyer, string passengerName);
@@ -68,7 +69,7 @@ contract Flight {
 
     function buyTicket(address payable _buyer, string memory _passengerName) external payable {
         require(msg.value == baseFare, "Provide correct amount");
-        passengers[passengerCount] = Passenger({buyer: _buyer, passengerName: _passengerName});
+        passengers[passengerCount] = Passenger({buyer: _buyer, passengerName: _passengerName, refunded: false});
         passengerCount = passengerCount.add(1);
         emit PassengerAdded(_buyer, _passengerName);
     }
@@ -107,7 +108,13 @@ contract Flight {
     function publicWithdraw() external {
         require(status == Status.settled, "Not settled");
         require(shouldRefund == true, "No refund");
-        transferFund(msg.sender, baseFare);
+        for(uint256 i = 0; i < passengerCount; i++){
+            if (passengers[i].buyer == msg.sender){
+                require(passengers[i].refunded == true, "Already claimed the fund");
+                transferFund(msg.sender, baseFare);
+            }
+        }
+        
     }
 
     function claimDelayRaise() external {
