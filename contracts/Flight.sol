@@ -37,11 +37,6 @@ contract Flight {
     event DelayDisputeRaised(address sender);
     event Withdrawal(address withdrawer, uint256 amount);
 
-    modifier onlyFlightOwner {
-        require(msg.sender == flightOwner, "Not authorized");
-        _;
-    }
-
     modifier noDispute {
         require(status == Status.noDispute, "Cannot withdraw, in dispute");
         _;
@@ -96,7 +91,7 @@ contract Flight {
         status = Status.settled;
     }
 
-    function withdrawMoney() external onlyFlightOwner noDispute {
+    function withdrawMoney() external noDispute {
         require(
             now >= timestamp.add(withdrawWait),
             "Withdraw time not reached"
