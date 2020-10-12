@@ -37,9 +37,9 @@ contract FlightFactory {
             _baseFare,
             _passengerLimit,
             escrow,
-            _baseFare / 2,
             msg.sender
         );
+        address(_flight).transfer(msg.value);
         flights[flightCount] = FlightInfo({flight: address(_flight)});
         flightCount = flightCount.add(1);
         emit FlightAdded(address(_flight));

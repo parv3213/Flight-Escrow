@@ -46,6 +46,8 @@ contract Flight {
         require(status == Status.noDispute, "Cannot withdraw, in dispute");
         _;
     }
+    
+    receive() external payable{}
 
     constructor(
         uint256 _timestamp,
@@ -54,7 +56,6 @@ contract Flight {
         uint256 _baseFare,
         uint256 _passengerLimit,
         address payable _escrow,
-        uint256 _disputeFee,
         address payable _flightOwner
     ) public {
         flightOwner = _flightOwner;
@@ -64,10 +65,10 @@ contract Flight {
         baseFare = _baseFare;
         passengerLimit = _passengerLimit;
         escrow = _escrow;
-        disputeFee = _disputeFee;
+        disputeFee = _baseFare/2;
     }
 
-    function buyTicket(address payable _buyer, string memory _passengerName) external payable {
+    function buyTicket(address payable _buyer, string calldata _passengerName) external payable {
         require(msg.value == baseFare, "Provide correct amount");
         passengers[passengerCount] = Passenger({buyer: _buyer, passengerName: _passengerName, refunded: false});
         passengerCount = passengerCount.add(1);
