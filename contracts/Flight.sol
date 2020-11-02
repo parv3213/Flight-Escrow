@@ -38,7 +38,7 @@ contract Flight {
     event Withdrawal(address withdrawer, uint256 amount);
 
     modifier noDispute {
-        require(status == Status.noDispute, "Cannot withdraw, in dispute");
+        require(status != Status.inDispute, "In dispute");
         _;
     }
     
@@ -96,7 +96,7 @@ contract Flight {
             now >= timestamp.add(withdrawWait),
             "Withdraw time not reached"
         );
-        require(shouldRefund == false, "Cannot withdraw!");
+        require(shouldRefund == false, "Cannot withdraw");
         transferFund(flightOwner, address(this).balance);
         status = Status.settled;
     }
@@ -106,7 +106,8 @@ contract Flight {
         require(shouldRefund == true, "No refund");
         for(uint256 i = 0; i < passengerCount; i++){
             if (passengers[i].buyer == msg.sender){
-                require(passengers[i].refunded == true, "Already claimed the fund");
+                require(passengers[i].refunded == false, "Already claimed the fund");
+                passengers[i].refunded = true;
                 transferFund(msg.sender, baseFare);
             }
         }
