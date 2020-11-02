@@ -52,7 +52,6 @@ contract("Flight", ([escrow, flightOwner, passenger1, passenger2, passenger3, ac
         });
         const flightAddress = receipt.logs[0].args[0];
         f = await Flight.at(flightAddress);
-        console.log(ff.address, f.address);
     });
     it("Check parameters", async () => {
         assert.equal(parseFloat(await f.status()), 0);
@@ -104,6 +103,7 @@ contract("Flight", ([escrow, flightOwner, passenger1, passenger2, passenger3, ac
     });
 });
 
+// Dispute raised but shouldRefund = false
 contract("Flight", ([escrow, flightOwner, passenger1, passenger2, passenger3, account]) => {
     before(async () => {
         timestamp = parseInt(await time.latest()) + 24 * 60 * 60;
@@ -114,7 +114,6 @@ contract("Flight", ([escrow, flightOwner, passenger1, passenger2, passenger3, ac
         });
         const flightAddress = receipt.logs[0].args[0];
         f = await Flight.at(flightAddress);
-        console.log(ff.address, f.address);
     });
     it("Create a new flight and raise false dispute", async () => {
         await f.buyTicket(passenger1, "Stuart Little", { from: passenger1, value: baseFare });
@@ -131,6 +130,113 @@ contract("Flight", ([escrow, flightOwner, passenger1, passenger2, passenger3, ac
         await expectRevert(f.flightDelayRaise(), "Not allowed");       
     });
     it("Escrow makes the decision", async () => {
-        
+        await  expectRevert(f.escrowDecision("As per our data the flight took off at right time",false, {from: flightOwner}), "Not authorized");
+        await f.escrowDecision("As per our data the flight took off at right time", false);
+        assert.equal(await f.escrowDecisionReason(), "As per our data the flight took off at right time")
+        assert.equal(await f.shouldRefund(), false);
+        assert.equal(parseFloat(await f.status()), 2);
     })
+    it("Public should NOT be able to withdraw", async() => {
+        await expectRevert(f.publicWithdraw(), "No refund")
+    })
+    it("Delay claim raise should NOT be able to claim", async() => {
+        await expectRevert(f.claimDelayRaise(), "Not eligible");
+    })
+    it("Flight owner can withdraw money", async() => {
+        await time.increaseTo(timestamp + 172800);
+        const oldFlightOwnerBalance = parseFloat(await web3.eth.getBalance(flightOwner));
+        await f.withdrawMoney();
+        const newFlightOwnerBalance = parseFloat(await web3.eth.getBalance(flightOwner));
+        assert.equal(newFlightOwnerBalance - oldFlightOwnerBalance, parseFloat(web3.utils.toWei("0.35")));
+        assert.equal(parseFloat(await f.status()), 2);
+    })
+});
+
+// Dispute raised but shouldRefund = true
+contract("Flight", ([escrow, flightOwner, passenger1, passenger2, passenger3, account]) => {
+    before(async () => {
+        timestamp = parseInt(await time.latest()) + 24 * 60 * 60;
+        ff = await FlightFactory.deployed();
+        const receipt = await ff.addFlight(timestamp, departure, arrival, baseFare, passengerLimit, {
+            from: flightOwner,
+            value: disputeFee,
+        });
+        const flightAddress = receipt.logs[0].args[0];
+        f = await Flight.at(flightAddress);
+    });
+    it("Create a new flight and raise false dispute", async () => {
+        await f.buyTicket(passenger1, "Stuart Little", { from: passenger1, value: baseFare });
+        await f.buyTicket(passenger2, "Wonder Women", { from: passenger2, value: baseFare });
+        await f.buyTicket(passenger3, "Spider Man", { from: passenger3, value: baseFare });
+        await expectRevert(f.flightDelayRaise(), "Delay limit not reached");
+        await time.increaseTo(timestamp + 10800);
+        await expectRevert(f.flightDelayRaise(), "Provide correct dispute fee");
+        const receipt = await f.flightDelayRaise({value: disputeFee});
+        assert.equal(parseFloat(await f.status()), 1);
+        assert.equal(await f.delayDisputeRaiser(), escrow);
+        assert.equal(receipt.logs[0].event, "DelayDisputeRaised");
+        assert.equal(receipt.logs[0].args[0], escrow);
+        await expectRevert(f.flightDelayRaise(), "Not allowed");    
+        await expectRevert(f.withdrawMoney({from: flightOwner}), "In dispute");
+    });
+    it("Escrow makes the decision", async () => {
+        await  expectRevert(f.escrowDecision("As per our data the flight took off late. So should refund to passengers",true, {from: flightOwner}), "Not authorized");
+        await f.escrowDecision("As per our data the flight took off late. So should refund to passengers", true);
+        assert.equal(await f.escrowDecisionReason(), "As per our data the flight took off late. So should refund to passengers")
+        assert.equal(await f.shouldRefund(), true);
+        assert.equal(parseFloat(await f.status()), 2);
+    })
+    it("Flight owner can NOT withdraw money", async() => {
+        await time.increaseTo(timestamp + 172800);
+        const oldFlightOwnerBalance = parseFloat(await web3.eth.getBalance(flightOwner));
+        await expectRevert(f.withdrawMoney(), "Cannot withdraw");
+        const newFlightOwnerBalance = parseFloat(await web3.eth.getBalance(flightOwner));
+        assert.equal(newFlightOwnerBalance - oldFlightOwnerBalance, parseFloat(web3.utils.toWei("0")));
+        assert.equal(parseFloat(await f.status()), 2);
+    })
+    it("Public should be able to withdraw", async() => {
+        const oldPassenger1Balance = parseFloat(await web3.eth.getBalance(passenger1));
+        await f.publicWithdraw({from: passenger1});
+        const newPassenger1Balance = parseFloat(await web3.eth.getBalance(passenger1));
+        assert.equal( parseFloat(web3.utils.fromWei(String(newPassenger1Balance-oldPassenger1Balance))).toFixed(5) , parseFloat(web3.utils.fromWei(baseFare)).toFixed(5) );
+
+        const oldPassenger2Balance = parseFloat(await web3.eth.getBalance(passenger2));
+        await f.publicWithdraw({from: passenger2});
+        const newPassenger2Balance = parseFloat(await web3.eth.getBalance(passenger2));
+        assert.equal((parseFloat(web3.utils.fromWei(String(newPassenger2Balance - oldPassenger2Balance)))).toFixed(5), parseFloat(web3.utils.fromWei(baseFare)).toFixed(5) );
+
+        const oldPassenger3Balance = parseFloat(await web3.eth.getBalance(passenger3));
+        await f.publicWithdraw({from: passenger3});
+        const newPassenger3Balance = parseFloat(await web3.eth.getBalance(passenger3));
+        assert.equal((parseFloat(web3.utils.fromWei(String(newPassenger3Balance - oldPassenger3Balance)))).toFixed(5), parseFloat(web3.utils.fromWei(baseFare)).toFixed(5) );
+
+        await expectRevert(f.publicWithdraw({from: passenger3}), "Already claimed the fund");
+    })
+    it("Delay claim raise should be able to claim", async() => {
+        const oldDisputerBalance = parseFloat(await web3.eth.getBalance(escrow));
+        await f.claimDelayRaise();
+        const newDisputerBalance = parseFloat(await web3.eth.getBalance(escrow));
+        assert.equal((parseFloat(web3.utils.fromWei(String(newDisputerBalance - oldDisputerBalance)))).toFixed(5), parseFloat(parseFloat(web3.utils.fromWei(baseFare))*0.5).toFixed(5) );
+    })
+});
+
+// Dispute raised cannot be raised after 
+contract("Flight", ([escrow, flightOwner, passenger1, passenger2, passenger3, account]) => {
+    before(async () => {
+        timestamp = parseInt(await time.latest()) + 24 * 60 * 60;
+        ff = await FlightFactory.deployed();
+        const receipt = await ff.addFlight(timestamp, departure, arrival, baseFare, passengerLimit, {
+            from: flightOwner,
+            value: disputeFee,
+        });
+        const flightAddress = receipt.logs[0].args[0];
+        f = await Flight.at(flightAddress);
+    });
+    it("Create a new flight and raise false dispute", async () => {
+        await f.buyTicket(passenger1, "Stuart Little", { from: passenger1, value: baseFare });
+        await f.buyTicket(passenger2, "Wonder Women", { from: passenger2, value: baseFare });
+        await f.buyTicket(passenger3, "Spider Man", { from: passenger3, value: baseFare });
+        await time.increaseTo(timestamp + 172801);
+        await expectRevert(f.flightDelayRaise({value: disputeFee}), "Dispute time up");
+    });
 });
