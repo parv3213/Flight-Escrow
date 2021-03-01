@@ -20,3 +20,5 @@ scripts/coverage.sh
 scripts/startGanache.bat
 scripts/startGanache.sh
 scripts/test.sh
+contracts/artifacts/Migrations_metadata.json
+contracts/artifacts/Migrations.json

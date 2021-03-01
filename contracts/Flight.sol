@@ -1,48 +1,51 @@
+pragma solidity 0.8.1;
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.6.2;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-
+// ! remove dispute fee
 contract Flight {
-    using SafeMath for uint256;
 
-    enum Status {noDispute, inDispute, settled}
-    Flight.Status public status = Status.noDispute;
-
-    uint256 public timestamp;
-    uint256 public baseFare;
-    uint256 public passengerLimit;
-    uint256 public delayLimit = 10800;
-    uint256 public withdrawWait = 172800;
-    uint256 public disputeFee;
-    address payable public flightOwner;
-    address payable public escrow;
-    bytes32 public departure;
-    bytes32 public arrival;
-
-    uint256 public passengerCount;
-    address payable public delayDisputeRaiser;
-    string public escrowDecisionReason;
-    bool public shouldRefund = false;
-
-    mapping(uint256 => Passenger) public passengers;
-
+    /// DATA STRUCTURES ///
     struct Passenger {
-        address payable buyer;
+        address buyer;
         string passengerName;
         bool refunded;
     }
+    enum Status {noDispute, inDispute, settled}
 
-    event PassengerAdded(address indexed buyer, string passengerName);
-    event DelayDisputeRaised(address sender);
-    event Withdrawal(address withdrawer, uint256 amount);
+    /// CONSTANT PARAMETERS ///
+    uint256 public constant delayLimit = 10800; //3 hr
+    uint256 public constant withdrawWait = 172800; //4 days
+    
+    /// CONSTRUCTOR PARAMETERS ///
+    uint256 public timestamp;
+    uint256 public baseFare;
+    uint256 public passengerLimit;
+    uint256 public disputeFee;
+    address public flightOwner;
+    address public escrow;
+    bytes32 public departure;
+    bytes32 public arrival;
+
+    /// FLIGHT DYNAMIC VARIABLE ///
+    uint256 public passengerCount; //will start from 1
+    address public delayDisputeRaiser;
+    bool public deplayMoneyClaimed;
+    string public escrowDecisionReason;
+    bool public shouldRefund;
+    Flight.Status public status = Status.noDispute;
+    mapping(uint256 => Passenger) public passengers;
+
+    /// EVENTS ///
+    event PassengerAdded(address indexed buyer, string indexed passengerName);
+    event DelayDisputeRaised(address indexed sender);
+    event Withdrawal(address indexed withdrawer, uint256 amount);
 
     modifier noDispute {
         require(status != Status.inDispute, "In dispute");
         _;
     }
-    
-    receive() external payable{}
+
+    receive() external payable {}
 
     constructor(
         uint256 _timestamp,
@@ -50,30 +53,37 @@ contract Flight {
         bytes32 _arrival,
         uint256 _baseFare,
         uint256 _passengerLimit,
-        address payable _escrow,
-        address payable _flightOwner
-    ) public {
-        flightOwner = _flightOwner;
+        address _escrow,
+        address _flightOwner
+    ) {
         timestamp = _timestamp;
         departure = _departure;
         arrival = _arrival;
         baseFare = _baseFare;
         passengerLimit = _passengerLimit;
         escrow = _escrow;
-        disputeFee = _baseFare/2;
+        flightOwner = _flightOwner;
+        disputeFee = _baseFare / 2;
     }
 
-    function buyTicket(address payable _buyer, string calldata _passengerName) external payable {
+    function buyTicket(string calldata _passengerName)
+        external
+        payable
+    {
         require(msg.value == baseFare, "Provide correct amount");
-        passengers[passengerCount] = Passenger({buyer: _buyer, passengerName: _passengerName, refunded: false});
-        passengerCount = passengerCount.add(1);
-        emit PassengerAdded(_buyer, _passengerName);
+        passengerCount = passengerCount++;
+        passengers[passengerCount] = Passenger({
+            buyer: msg.sender,
+            passengerName: _passengerName,
+            refunded: false
+        });
+        emit PassengerAdded(msg.sender, _passengerName);
     }
 
     function flightDelayRaise() external payable {
         require(status == Status.noDispute, "Not allowed");
-        require(now >= (timestamp.add(delayLimit)), "Delay limit not reached");
-        require(now <= timestamp.add(withdrawWait), "Dispute time up");
+        require(block.timestamp >= timestamp + delayLimit, "Delay limit not reached");
+        require(block.timestamp <= timestamp + withdrawWait, "Dispute time up");
         require(msg.value == disputeFee, "Provide correct dispute fee");
         status = Status.inDispute;
         delayDisputeRaiser = msg.sender;
@@ -87,23 +97,23 @@ contract Flight {
         require(msg.sender == escrow, "Not authorized");
         escrowDecisionReason = _reason;
         shouldRefund = _shouldRefund;
-        escrow.transfer(disputeFee);
+        payable(escrow).transfer(disputeFee/2); // escrow gets half of dispute fee
         status = Status.settled;
     }
 
     function withdrawMoney() external noDispute {
         require(
-            now >= timestamp.add(withdrawWait),
+            block.timestamp >= timestamp + withdrawWait,
             "Withdraw time not reached"
         );
-        require(shouldRefund == false, "Cannot withdraw");
+        require(!shouldRefund, "Cannot withdraw");
         transferFund(flightOwner, address(this).balance);
         status = Status.settled;
     }
 
     function publicWithdraw() external {
         require(status == Status.settled, "Not settled");
-        require(shouldRefund == true, "No refund");
+        require(shouldRefund, "No refund");
         for(uint256 i = 0; i < passengerCount; i++){
             if (passengers[i].buyer == msg.sender){
                 require(passengers[i].refunded == false, "Already claimed the fund");
@@ -111,16 +121,28 @@ contract Flight {
                 transferFund(msg.sender, baseFare);
             }
         }
-        
     }
 
     function claimDelayRaise() external {
-        require(shouldRefund == true, "Not eligible");
-        transferFund(delayDisputeRaiser, disputeFee);
+        require(shouldRefund && !deplayMoneyClaimed, "Not eligible");
+        deplayMoneyClaimed = true;
+        transferFund(delayDisputeRaiser, 2*disputeFee);
     }
 
-    function transferFund(address payable _to, uint256 _amount) internal {
-        _to.transfer(_amount);
+    function transferFund(address _to, uint256 _amount) internal {
+        payable(_to).transfer(_amount);
         emit Withdrawal(_to, _amount);
+    }
+
+    function buyerDetails(address _buyer) public view returns(bytes[] memory){
+        bytes[] memory _buyerDetails;
+        uint256 _buyerBookingCount;
+        for (uint256 i = 0; i < passengerCount; i++){
+            if (passengers[i].buyer == _buyer) {
+                _buyerDetails[_buyerBookingCount] = abi.encodePacked(i, passengers[i].passengerName, passengers[i].refunded);
+                _buyerBookingCount++;
+            }
+        }
+        return _buyerDetails;
     }
 }
