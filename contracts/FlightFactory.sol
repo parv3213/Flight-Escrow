@@ -33,8 +33,8 @@ contract FlightFactory {
                 msg.sender
             );
         flights[flightCount] = address(_flight);
-        flightCount = flightCount+1;
         payable(flights[flightCount]).transfer(msg.value);
-        emit FlightAdded(flights[flightCount], msg.sender);
+        flightCount = flightCount+1;
+        emit FlightAdded(address(_flight), msg.sender);
     }
 }
