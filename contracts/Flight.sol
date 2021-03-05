@@ -29,14 +29,14 @@ contract Flight {
     /// FLIGHT DYNAMIC VARIABLE ///
     uint256 public passengerCount; //will start from 1
     address public delayDisputeRaiser;
-    bool public deplayMoneyClaimed;
+    bool public delayMoneyClaimed;
     string public escrowDecisionReason;
     bool public shouldRefund;
     Flight.Status public status = Status.noDispute;
-    mapping(uint256 => Passenger) public passengers;
+    mapping(uint256 => Passenger) public passengers; //starting from index 1
 
     /// EVENTS ///
-    event PassengerAdded(address indexed buyer, string indexed passengerName);
+    event PassengerAdded(address indexed buyer, string passengerName);
     event DelayDisputeRaised(address indexed sender);
     event Withdrawal(address indexed withdrawer, uint256 amount);
 
@@ -63,7 +63,7 @@ contract Flight {
         passengerLimit = _passengerLimit;
         escrow = _escrow;
         flightOwner = _flightOwner;
-        disputeFee = _baseFare / 2;
+        disputeFee = _baseFare / 4;
     }
 
     function buyTicket(string calldata _passengerName)
@@ -71,7 +71,7 @@ contract Flight {
         payable
     {
         require(msg.value == baseFare, "Provide correct amount");
-        passengerCount = passengerCount++;
+        passengerCount++;
         passengers[passengerCount] = Passenger({
             buyer: msg.sender,
             passengerName: _passengerName,
@@ -97,7 +97,7 @@ contract Flight {
         require(msg.sender == escrow, "Not authorized");
         escrowDecisionReason = _reason;
         shouldRefund = _shouldRefund;
-        payable(escrow).transfer(disputeFee/2); // escrow gets half of dispute fee
+        payable(escrow).transfer(disputeFee);
         status = Status.settled;
     }
 
@@ -124,9 +124,9 @@ contract Flight {
     }
 
     function claimDelayRaise() external {
-        require(shouldRefund && !deplayMoneyClaimed, "Not eligible");
-        deplayMoneyClaimed = true;
-        transferFund(delayDisputeRaiser, 2*disputeFee);
+        require(shouldRefund && !delayMoneyClaimed, "Not eligible");
+        delayMoneyClaimed = true;
+        transferFund(delayDisputeRaiser, baseFare/2);
     }
 
     function transferFund(address _to, uint256 _amount) internal {
