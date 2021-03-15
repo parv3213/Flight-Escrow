@@ -130,18 +130,16 @@ contract("Flight", ([escrow, flightOwner, passenger1, passenger2, passenger3, ac
 		await expectRevert(f.flightDelayRaise(), "Not allowed");
 	});
 	it("Escrow makes the decision", async () => {
-		const oldEscrowbalance = parseFloat((await web3.eth.getBalance(escrow)) / 1e18);
+		// const oldEscrowbalance = parseFloat((await web3.eth.getBalance(escrow)) / 1e18);
 		await expectRevert(
 			f.escrowDecision("As per our data the flight took off at right time", false, { from: flightOwner }),
 			"Not authorized"
 		);
 		await f.escrowDecision("As per our data the flight took off at right time", false);
-		const newEscrowBalance = parseFloat((await web3.eth.getBalance(escrow)) / 1e18);
+		// const newEscrowBalance = parseFloat((await web3.eth.getBalance(escrow)) / 1e18);
 		assert.equal(await f.escrowDecisionReason(), "As per our data the flight took off at right time");
 		assert.equal(await f.shouldRefund(), false);
 		assert.equal(parseFloat(await f.status()), 2);
-		console.log(newEscrowBalance - oldEscrowbalance, disputeFee / (2 * 1e18));
-		console.log((newEscrowBalance - oldEscrowbalance).toFixed(3), (disputeFee / (2 * 1e18)).toFixed(3));
 	});
 	it("Public should NOT be able to withdraw", async () => {
 		await expectRevert(f.publicWithdraw(), "No refund");
@@ -210,51 +208,46 @@ contract("Flight", ([escrow, flightOwner, passenger1, passenger2, passenger3, ac
 		assert.equal(parseFloat(await f.status()), 2);
 	});
 	it("Public should be able to withdraw", async () => {
-		console.log((await web3.eth.getBalance(f.address)) / 1e18);
+		assert.equal((await web3.eth.getBalance(f.address)) / 1e18, 0.35);
 		const oldPassenger1Balance = (await web3.eth.getBalance(passenger1)) / 1e18;
 		const receipt = await f.publicWithdraw({ from: passenger1 });
 		assert.equal(receipt.logs[0].args.withdrawer, passenger1);
 		assert.equal(receipt.logs[0].args.amount / 1e18, baseFare / 1e18);
 		const newPassenger1Balance = (await web3.eth.getBalance(passenger1)) / 1e18;
-		console.warn(
-			parseFloat(newPassenger1Balance - oldPassenger1Balance).toFixed(5),
-			parseFloat(web3.utils.fromWei(baseFare)).toFixed(5)
+		assert.equal(
+			parseFloat(newPassenger1Balance - oldPassenger1Balance).toFixed(2),
+			parseFloat(web3.utils.fromWei(baseFare)).toFixed(2)
 		);
 
 		const oldPassenger2Balance = (await web3.eth.getBalance(passenger2)) / 1e18;
 		await f.publicWithdraw({ from: passenger2 });
 		const newPassenger2Balance = (await web3.eth.getBalance(passenger2)) / 1e18;
-		console.warn(
-			parseFloat(newPassenger2Balance - oldPassenger2Balance).toFixed(5),
-			parseFloat(web3.utils.fromWei(baseFare)).toFixed(5)
+		assert.equal(
+			parseFloat(newPassenger2Balance - oldPassenger2Balance).toFixed(2),
+			parseFloat(web3.utils.fromWei(baseFare)).toFixed(2)
 		);
 
 		const oldPassenger3Balance = (await web3.eth.getBalance(passenger3)) / 1e18;
 		await f.publicWithdraw({ from: passenger3 });
 		const newPassenger3Balance = (await web3.eth.getBalance(passenger3)) / 1e18;
-		console.warn(
-			parseFloat(newPassenger3Balance - oldPassenger3Balance).toFixed(5),
-			parseFloat(web3.utils.fromWei(baseFare)).toFixed(5)
+		assert.equal(
+			parseFloat(newPassenger3Balance - oldPassenger3Balance).toFixed(2),
+			parseFloat(web3.utils.fromWei(baseFare)).toFixed(2)
 		);
-		console.log((await web3.eth.getBalance(f.address)) / 1e18);
+		assert.equal((await web3.eth.getBalance(f.address)) / 1e18, 0.05);
 		await expectRevert(f.publicWithdraw({ from: passenger1 }), "Already claimed the fund");
 		await expectRevert(f.publicWithdraw({ from: passenger2 }), "Already claimed the fund");
 		await expectRevert(f.publicWithdraw({ from: passenger3 }), "Already claimed the fund");
 	});
 	it("Delay claim raise should be able to claim", async () => {
 		const oldDisputerBalance = parseFloat(await web3.eth.getBalance(escrow));
-		console.log((await f.baseFare()) / 1e18);
-		console.log((await f.disputeFee()) / 1e18);
 		await f.claimDelayRaise();
 		const newDisputerBalance = parseFloat(await web3.eth.getBalance(escrow));
-		console.log((await web3.eth.getBalance(f.address)) / 1e18);
-
-		console.log(
-			parseFloat(web3.utils.fromWei(String(newDisputerBalance - oldDisputerBalance))).toFixed(5),
-			parseFloat(baseFare / (2 * 1e18)).toFixed(5)
+		assert.equal(
+			parseFloat(web3.utils.fromWei(String(newDisputerBalance - oldDisputerBalance))).toFixed(2),
+			parseFloat(baseFare / (2 * 1e18)).toFixed(2)
 		);
-		console.log((await web3.eth.getBalance(f.address)) / 1e18);
-		// console.log(await f.getPastEvents("allEvents", { fromBlock: 0, toBlock: "latest" }));
+		assert.equal((await web3.eth.getBalance(f.address)) / 1e18, 0);
 	});
 });
 
