@@ -114,7 +114,7 @@ contract Flight {
     function publicWithdraw() external {
         require(status == Status.settled, "Not settled");
         require(shouldRefund, "No refund");
-        for(uint256 i = 0; i < passengerCount; i++){
+        for(uint256 i = 1; i <= passengerCount; i++){
             if (passengers[i].buyer == msg.sender){
                 require(passengers[i].refunded == false, "Already claimed the fund");
                 passengers[i].refunded = true;
@@ -137,7 +137,7 @@ contract Flight {
     function buyerDetails(address _buyer) public view returns(bytes[] memory){
         bytes[] memory _buyerDetails;
         uint256 _buyerBookingCount;
-        for (uint256 i = 0; i < passengerCount; i++){
+        for (uint256 i = 1; i <= passengerCount; i++){
             if (passengers[i].buyer == _buyer) {
                 _buyerDetails[_buyerBookingCount] = abi.encodePacked(i, passengers[i].passengerName, passengers[i].refunded);
                 _buyerBookingCount++;
