@@ -3,7 +3,6 @@ node_modules
 build
 .jshintrc
 package-lock.json
-coverage
 .env
 .coverage_contracts/Flight.sol
 .coverage_contracts/FlightFactory.sol
