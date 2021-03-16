@@ -134,8 +134,7 @@ contract Flight {
         emit Withdrawal(_to, _amount);
     }
 
-    function buyerDetails(address _buyer) public view returns(bytes[] memory){
-        bytes[] memory _buyerDetails;
+    function buyerDetails(address _buyer) external view returns(bytes[] memory _buyerDetails){
         uint256 _buyerBookingCount;
         for (uint256 i = 1; i <= passengerCount; i++){
             if (passengers[i].buyer == _buyer) {
@@ -143,6 +142,5 @@ contract Flight {
                 _buyerBookingCount++;
             }
         }
-        return _buyerDetails;
     }
 }
